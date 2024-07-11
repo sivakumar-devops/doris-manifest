@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+ name: bold-dorisbe-fileserver
+ namespace: doris
+spec:
+ capacity:
+   storage: 3Gi
+ accessModes:
+ - ReadWriteMany
+ nfs:
+   path: /filestore/DorisBe
+   server: 10.109.160.2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ name: bold-dorisbe-fileserver-claim
+ namespace: doris
+spec:
+ accessModes:
+ - ReadWriteMany
+ storageClassName: ""
+ volumeName: bold-dorisbe-fileserver
+ resources:
+   requests:
+     storage: 3Gi

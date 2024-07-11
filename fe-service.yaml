@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: doriscluster-sample-fe-service
+  namespace: doris
+  labels:
+    app.doris.ownerreference/name: doriscluster-sample
+    app.doris.service/role: access
+    app.kubernetes.io/component: fe
+  annotations:
+    app.doris.components/hash: "3050675205"
+    cloud.google.com/neg: '{"ingress":true}'
+spec:
+  type: LoadBalancer
+  selector:
+    app.doris.ownerreference/name: doriscluster-sample-fe
+    app.kubernetes.io/component: fe
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+  - IPv4
+  ports:
+  - name: http-port
+    port: 8030
+    targetPort: 8030
+    protocol: TCP
+  - name: rpc-port
+    port: 9020
+    targetPort: 9020
+    protocol: TCP
+  - name: query-port
+    port: 9030
+    targetPort: 9030
+    protocol: TCP
+  - name: edit-log-port
+    port: 9010
+    targetPort: 9010
+    protocol: TCP

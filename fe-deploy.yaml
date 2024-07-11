@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doriscluster-sample-fe
+  namespace: doris
+  labels:
+    app.doris.cluster: doriscluster-sample
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: fe
+  serviceName: "doriscluster-sample-fe-internal"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.doris.cluster: doriscluster-sample
+        app.doris.ownerreference/name: doriscluster-sample-fe
+        app.kubernetes.io/component: fe
+    spec:
+      containers:
+      - name: fe
+        image: selectdb/doris.fe-ubuntu:2.1.1
+        command: ["/opt/apache-doris/fe_entrypoint.sh"]
+        args: ["$(ENV_FE_ADDR)"]
+        ports:
+        - containerPort: 8030
+        - containerPort: 9020
+        - containerPort: 9030
+        - containerPort: 9010
+        resources:
+          limits:
+            cpu: 3
+            memory: 8Gi
+          requests:
+            cpu: 3
+            memory: 8Gi
+        livenessProbe:
+          tcpSocket:
+            port: 9030
+          initialDelaySeconds: 80
+          timeoutSeconds: 180
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8030
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 8030
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 60
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: USER
+          value: root
+        - name: DORIS_ROOT
+          value: /opt/apache-doris
+        - name: ENV_FE_ADDR
+          value: doriscluster-sample-fe-service
+        - name: FE_QUERY_PORT
+          value: "9030"
+        volumeMounts:
+        - name: podinfo
+          mountPath: /etc/podinfo
+        - name: fe-meta
+          mountPath: /opt/apache-doris/fe/doris-meta
+        - name: kube-api-access
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      volumes:
+      - name: fe-meta
+        persistentVolumeClaim:
+          claimName: bold-dorisfe-fileserver-claim
+      - name: podinfo
+        downwardAPI:
+          items:
+          - path: "labels"
+            fieldRef:
+              fieldPath: metadata.labels
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
+      - name: kube-api-access
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3607
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+              - key: ca.crt
+                path: ca.crt
+          - downwardAPI:
+              items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations

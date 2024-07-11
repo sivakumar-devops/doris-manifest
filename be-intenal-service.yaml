@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: doriscluster-sample-be-internal
+  namespace: doris
+  labels:
+    app.doris.ownerreference/name: doriscluster-sample
+    app.doris.service/role: internal
+    app.kubernetes.io/component: be
+  annotations:
+    app.doris.components/hash: "2497990871"
+    cloud.google.com/neg: '{"ingress":true}'
+spec:
+  type: ClusterIP
+  selector:
+    app.doris.ownerreference/name: doriscluster-sample-be
+    app.kubernetes.io/component: be
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+  - IPv4
+  ports:
+  - name: heartbeat-port
+    port: 9050
+    targetPort: 9050
+    protocol: TCP

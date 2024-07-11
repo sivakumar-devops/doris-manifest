@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: doriscluster-sample-fe-internal
+  namespace: doris
+  labels:
+    app.doris.ownerreference/name: doriscluster-sample
+    app.doris.service/role: internal
+    app.kubernetes.io/component: fe
+  annotations:
+    app.doris.components/hash: "2911846711"
+    cloud.google.com/neg: '{"ingress":true}'
+spec:
+  type: ClusterIP
+  selector:
+    app.doris.ownerreference/name: doriscluster-sample-fe
+    app.kubernetes.io/component: fe
+  ports:
+  - name: query-port
+    port: 9030
+    targetPort: 9030

@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doriscluster-sample-be
+  namespace: doris
+  labels:
+    app.doris.cluster: doriscluster-sample
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: be
+  serviceName: "doriscluster-sample-be-service"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.doris.cluster: doriscluster-sample
+        app.doris.ownerreference/name: doriscluster-sample-be
+        app.kubernetes.io/component: be
+    spec:
+      initContainers:
+      - name: default-init
+        image: selectdb/alpine:latest
+        securityContext:
+          privileged: true
+        command: ["/bin/sh"]
+        args: ["-c", "sysctl -w vm.max_map_count=2000000 && swapoff -a"]
+        volumeMounts:
+        - name: kube-api-access
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      containers:
+      - name: be
+        image: selectdb/doris.be-ubuntu:2.1.1
+        command: ["/opt/apache-doris/be_entrypoint.sh"]
+        args: ["$(ENV_FE_ADDR)"]
+        ports:
+        - containerPort: 9060
+        - containerPort: 8040
+        - containerPort: 9050
+        - containerPort: 8060
+        resources:
+          limits:
+            cpu: 3
+            memory: 8Gi
+          requests:
+            cpu: 3
+            memory: 8Gi
+        livenessProbe:
+          tcpSocket:
+            port: 9050
+          initialDelaySeconds: 80
+          timeoutSeconds: 180
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8040
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 8040
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 60
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: USER
+          value: root
+        - name: DORIS_ROOT
+          value: /opt/apache-doris
+        - name: ENV_FE_ADDR
+          value: doriscluster-sample-fe-service
+        - name: FE_QUERY_PORT
+          value: "9030"
+        volumeMounts:
+        - name: podinfo
+          mountPath: /etc/podinfo
+        - name: be-storage
+          mountPath: /opt/apache-doris/be/storage
+        - name: kube-api-access
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      volumes:
+      - name: be-storage
+        persistentVolumeClaim:
+          claimName: bold-dorisbe-fileserver-claim
+      - name: podinfo
+        downwardAPI:
+          items:
+          - path: "labels"
+            fieldRef:
+              fieldPath: metadata.labels
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
+      - name: kube-api-access
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3607
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+              - key: ca.crt
+                path: ca.crt
+          - downwardAPI:
+              items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
