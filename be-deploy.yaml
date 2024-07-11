@@ -1,12 +1,9 @@
-# Please edit the object below. Lines beginning with a '#' will be ignored,
-# and an empty file will abort the edit. If an error occurs while saving this file will be
-# reopened with the relevant failures.
-#
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   annotations:
     app.doris.components/hash: "1272784587"
+  creationTimestamp: "2024-07-11T06:51:26Z"
   generation: 1
   labels:
     app.doris.ownerreference/name: doriscluster-sample
@@ -17,6 +14,9 @@ metadata:
   - apiVersion: doris.selectdb.com/v1
     kind: DorisCluster
     name: doriscluster-sample
+    uid: 55ef9f01-4bd1-4876-ac1b-c3853c92a74d
+  resourceVersion: "247409622"
+  uid: 55fac7ce-9d9a-4087-b4dd-abb30dcc684f
 spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
@@ -171,8 +171,9 @@ spec:
       securityContext: {}
       terminationGracePeriodSeconds: 30
       volumes:
-      - emptyDir: {}
-        name: be-storage
+      - name: be-storage
+        persistentVolumeClaim:
+          claimName: YOUR_EXISTING_PVC_NAME_HERE
       - downwardAPI:
           defaultMode: 420
           items:
@@ -189,13 +190,3 @@ spec:
     rollingUpdate:
       partition: 0
     type: RollingUpdate
-status:
-  availableReplicas: 1
-  collisionCount: 0
-  currentReplicas: 1
-  currentRevision: doriscluster-sample-be-6c45546cf4
-  observedGeneration: 1
-  readyReplicas: 1
-  replicas: 1
-  updateRevision: doriscluster-sample-be-6c45546cf4
-  updatedReplicas: 1

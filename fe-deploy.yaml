@@ -1,12 +1,9 @@
-# Please edit the object below. Lines beginning with a '#' will be ignored,
-# and an empty file will abort the edit. If an error occurs while saving this file will be
-# reopened with the relevant failures.
-#
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   annotations:
     app.doris.components/hash: "2613611586"
+  creationTimestamp: "2024-07-11T06:48:35Z"
   generation: 1
   labels:
     app.doris.ownerreference/name: doriscluster-sample
@@ -17,6 +14,9 @@ metadata:
   - apiVersion: doris.selectdb.com/v1
     kind: DorisCluster
     name: doriscluster-sample
+    uid: 55ef9f01-4bd1-4876-ac1b-c3853c92a74d
+  resourceVersion: "247407421"
+  uid: ed4fb92e-8e17-4587-aa61-2ea7008c4c2e
 spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
@@ -153,9 +153,10 @@ spec:
       securityContext: {}
       terminationGracePeriodSeconds: 30
       volumes:
-      - emptyDir: {}
-        name: fe-meta
-      - downwardAPI:
+      - name: fe-meta
+        emptyDir: {}
+      - name: podinfo
+        downwardAPI:
           defaultMode: 420
           items:
           - fieldRef:
@@ -166,11 +167,24 @@ spec:
               apiVersion: v1
               fieldPath: metadata.annotations
             path: annotations
-        name: podinfo
   updateStrategy:
     rollingUpdate:
       partition: 0
     type: RollingUpdate
+  volumeClaimTemplates:  # Add this section for using existing PVC
+  - metadata:
+      name: data  # Name of your volume claim template
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi  # Adjust size as per your requirement
+      storageClassName: your-storage-class-name  # Specify your storage class
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: fe  # Match labels as needed
+      volumeName: your-existing-pvc-name  # Specify the name of your existing PVC
 status:
   availableReplicas: 1
   collisionCount: 0
