@@ -1,37 +1,69 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
 apiVersion: v1
 kind: Service
 metadata:
-  name: doriscluster-sample-fe-service
-  namespace: doris
+  annotations:
+    app.doris.components/hash: "3938810302"
+    cloud.google.com/neg: '{"ingress":true}'
+  creationTimestamp: "2024-07-11T08:45:07Z"
+  finalizers:
+  - service.kubernetes.io/load-balancer-cleanup
   labels:
     app.doris.ownerreference/name: doriscluster-sample
     app.doris.service/role: access
     app.kubernetes.io/component: fe
-  annotations:
-    app.doris.components/hash: "3050675205"
-    cloud.google.com/neg: '{"ingress":true}'
+  name: doriscluster-sample-fe-service
+  namespace: doris
+  ownerReferences:
+  - apiVersion: doris.selectdb.com/v1
+    kind: DorisCluster
+    name: doriscluster-sample
+    uid: 59c0a316-5d16-449f-b3a4-d3edda6cdecd
+  resourceVersion: "247495990"
+  uid: c9473d11-9b07-47c0-8da7-a6d6dca9d010
 spec:
-  type: LoadBalancer
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 10.0.3.146
+  clusterIPs:
+  - 10.0.3.146
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http-port
+    nodePort: 30465
+    port: 8030
+    protocol: TCP
+    targetPort: 8030
+  - name: rpc-port
+    nodePort: 31610
+    port: 9020
+    protocol: TCP
+    targetPort: 9020
+  - name: query-port
+    nodePort: 30838
+    port: 9030
+    protocol: TCP
+    targetPort: 9030
+  - name: edit-log-port
+    nodePort: 31587
+    port: 9010
+    protocol: TCP
+    targetPort: 9010
   selector:
     app.doris.ownerreference/name: doriscluster-sample-fe
     app.kubernetes.io/component: fe
-  ipFamilyPolicy: SingleStack
-  ipFamilies:
-  - IPv4
-  ports:
-  - name: http-port
-    port: 8030
-    targetPort: 8030
-    protocol: TCP
-  - name: rpc-port
-    port: 9020
-    targetPort: 9020
-    protocol: TCP
-  - name: query-port
-    port: 9030
-    targetPort: 9030
-    protocol: TCP
-  - name: edit-log-port
-    port: 9010
-    targetPort: 9010
-    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+    - ip: 35.224.168.51
