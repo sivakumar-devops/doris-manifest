@@ -4,10 +4,12 @@ metadata:
   name: doriscluster-sample-be
   namespace: doris
   labels:
+    app.doris.ownerreference/name: doriscluster-sample
     app.doris.cluster: doriscluster-sample
 spec:
   selector:
     matchLabels:
+      app.doris.ownerreference/name: doriscluster-sample-be
       app.kubernetes.io/component: be
   serviceName: "doriscluster-sample-be-internal"
   replicas: 1
