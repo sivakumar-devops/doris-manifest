@@ -1,25 +1,45 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
 apiVersion: v1
 kind: Service
 metadata:
-  name: doriscluster-sample-be-internal
-  namespace: doris
+  annotations:
+    app.doris.components/hash: "3068153715"
+    cloud.google.com/neg: '{"ingress":true}'
+  creationTimestamp: "2024-07-11T08:47:56Z"
   labels:
     app.doris.ownerreference/name: doriscluster-sample
     app.doris.service/role: internal
     app.kubernetes.io/component: be
-  annotations:
-    app.doris.components/hash: "2497990871"
-    cloud.google.com/neg: '{"ingress":true}'
+  name: doriscluster-sample-be-internal
+  namespace: doris
+  ownerReferences:
+  - apiVersion: doris.selectdb.com/v1
+    kind: DorisCluster
+    name: doriscluster-sample
+    uid: 59c0a316-5d16-449f-b3a4-d3edda6cdecd
+  resourceVersion: "247496827"
+  uid: 42b4712b-25bd-4c18-9a75-ce3fac3180f2
 spec:
-  type: ClusterIP
-  selector:
-    app.doris.ownerreference/name: doriscluster-sample-be
-    app.kubernetes.io/component: be
-  ipFamilyPolicy: SingleStack
+  clusterIP: None
+  clusterIPs:
+  - None
+  internalTrafficPolicy: Cluster
   ipFamilies:
   - IPv4
+  ipFamilyPolicy: SingleStack
   ports:
   - name: heartbeat-port
     port: 9050
-    targetPort: 9050
     protocol: TCP
+    targetPort: 9050
+  publishNotReadyAddresses: true
+  selector:
+    app.doris.ownerreference/name: doriscluster-sample-be
+    app.kubernetes.io/component: be
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

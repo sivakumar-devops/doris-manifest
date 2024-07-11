@@ -1,21 +1,45 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
 apiVersion: v1
 kind: Service
 metadata:
-  name: doriscluster-sample-fe-internal
-  namespace: doris
+  annotations:
+    app.doris.components/hash: "1708290211"
+    cloud.google.com/neg: '{"ingress":true}'
+  creationTimestamp: "2024-07-11T08:45:07Z"
   labels:
     app.doris.ownerreference/name: doriscluster-sample
     app.doris.service/role: internal
     app.kubernetes.io/component: fe
-  annotations:
-    app.doris.components/hash: "2911846711"
-    cloud.google.com/neg: '{"ingress":true}'
+  name: doriscluster-sample-fe-internal
+  namespace: doris
+  ownerReferences:
+  - apiVersion: doris.selectdb.com/v1
+    kind: DorisCluster
+    name: doriscluster-sample
+    uid: 59c0a316-5d16-449f-b3a4-d3edda6cdecd
+  resourceVersion: "247494551"
+  uid: e7bd0440-ec7b-4f92-a8ae-96c0f6a1a364
 spec:
-  type: ClusterIP
-  selector:
-    app.doris.ownerreference/name: doriscluster-sample-fe
-    app.kubernetes.io/component: fe
+  clusterIP: None
+  clusterIPs:
+  - None
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
   ports:
   - name: query-port
     port: 9030
+    protocol: TCP
     targetPort: 9030
+  publishNotReadyAddresses: true
+  selector:
+    app.doris.ownerreference/name: doriscluster-sample-fe
+    app.kubernetes.io/component: fe
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

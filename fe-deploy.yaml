@@ -1,83 +1,83 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  annotations:
+    app.doris.components/hash: "2613611586"
+  creationTimestamp: "2024-07-11T06:48:35Z"
+  generation: 1
+  labels:
+    app.doris.ownerreference/name: doriscluster-sample
+    app.kubernetes.io/component: fe
   name: doriscluster-sample-fe
   namespace: doris
-  labels:
-    app.doris.cluster: doriscluster-sample
+  ownerReferences:
+  - apiVersion: doris.selectdb.com/v1
+    kind: DorisCluster
+    name: doriscluster-sample
+    uid: 55ef9f01-4bd1-4876-ac1b-c3853c92a74d
+  resourceVersion: "247407421"
+  uid: ed4fb92e-8e17-4587-aa61-2ea7008c4c2e
 spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
+      app.doris.ownerreference/name: doriscluster-sample-fe
       app.kubernetes.io/component: fe
-  serviceName: "doriscluster-sample-fe-internal"
-  replicas: 1
+  serviceName: doriscluster-sample-fe-internal
   template:
     metadata:
+      creationTimestamp: null
       labels:
         app.doris.cluster: doriscluster-sample
         app.doris.ownerreference/name: doriscluster-sample-fe
         app.kubernetes.io/component: fe
+      name: doriscluster-sample-fe
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - fe
+              topologyKey: kubernetes.io/hostname
+            weight: 20
       containers:
-      - name: fe
-        image: selectdb/doris.fe-ubuntu:2.1.1
-        command: ["/opt/apache-doris/fe_entrypoint.sh"]
-        args: ["$(ENV_FE_ADDR)"]
-        ports:
-        - containerPort: 8030
-        - containerPort: 9020
-        - containerPort: 9030
-        - containerPort: 9010
-        resources:
-          limits:
-            cpu: 3
-            memory: 8Gi
-          requests:
-            cpu: 3
-            memory: 8Gi
-        livenessProbe:
-          tcpSocket:
-            port: 9030
-          initialDelaySeconds: 80
-          timeoutSeconds: 180
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 8030
-          initialDelaySeconds: 0
-          timeoutSeconds: 1
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        startupProbe:
-          httpGet:
-            path: /api/health
-            port: 8030
-          initialDelaySeconds: 0
-          timeoutSeconds: 1
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 60
+      - args:
+        - $(ENV_FE_ADDR)
+        command:
+        - /opt/apache-doris/fe_entrypoint.sh
         env:
         - name: POD_NAME
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: metadata.name
         - name: POD_IP
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: status.podIP
         - name: HOST_IP
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: status.hostIP
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: metadata.namespace
+        - name: CONFIGMAP_MOUNT_PATH
+          value: /etc/doris
         - name: USER
           value: root
         - name: DORIS_ROOT
@@ -86,43 +86,112 @@ spec:
           value: doriscluster-sample-fe-service
         - name: FE_QUERY_PORT
           value: "9030"
+        - name: ELECT_NUMBER
+          value: "3"
+        image: selectdb/doris.fe-ubuntu:2.1.1
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /opt/apache-doris/fe_prestop.sh
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 80
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9030
+          timeoutSeconds: 180
+        name: fe
+        ports:
+        - containerPort: 8030
+          name: http-port
+          protocol: TCP
+        - containerPort: 9020
+          name: rpc-port
+          protocol: TCP
+        - containerPort: 9030
+          name: query-port
+          protocol: TCP
+        - containerPort: 9010
+          name: edit-log-port
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/health
+            port: 8030
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "3"
+            memory: 8Gi
+          requests:
+            cpu: "3"
+            memory: 8Gi
+        startupProbe:
+          failureThreshold: 60
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9030
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
         volumeMounts:
-        - name: podinfo
-          mountPath: /etc/podinfo
-        - name: fe-meta
-          mountPath: /opt/apache-doris/fe/doris-meta
-        - name: kube-api-access
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-          readOnly: true
+        - mountPath: /etc/podinfo
+          name: podinfo
+        - mountPath: /opt/apache-doris/fe/doris-meta
+          name: fe-meta
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
       volumes:
       - name: fe-meta
-        persistentVolumeClaim:
-          claimName: bold-dorisfe-fileserver-claim
+        emptyDir: {}
       - name: podinfo
         downwardAPI:
+          defaultMode: 420
           items:
-          - path: "labels"
-            fieldRef:
+          - fieldRef:
+              apiVersion: v1
               fieldPath: metadata.labels
-          - path: "annotations"
-            fieldRef:
+            path: labels
+          - fieldRef:
+              apiVersion: v1
               fieldPath: metadata.annotations
-      - name: kube-api-access
-        projected:
-          sources:
-          - serviceAccountToken:
-              path: token
-              expirationSeconds: 3607
-          - configMap:
-              name: kube-root-ca.crt
-              items:
-              - key: ca.crt
-                path: ca.crt
-          - downwardAPI:
-              items:
-              - path: "labels"
-                fieldRef:
-                  fieldPath: metadata.labels
-              - path: "annotations"
-                fieldRef:
-                  fieldPath: metadata.annotations
+            path: annotations
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:  # Add this section for using existing PVC
+  - metadata:
+      name: data  # Name of your volume claim template
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi  # Adjust size as per your requirement
+      storageClassName: your-storage-class-name  # Specify your storage class
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: fe  # Match labels as needed
+      volumeName: your-existing-pvc-name  # Specify the name of your existing PVC
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: doriscluster-sample-fe-5b5446b989
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: doriscluster-sample-fe-5b5446b989
+  updatedReplicas: 1
