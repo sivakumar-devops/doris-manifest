@@ -1,94 +1,89 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  annotations:
+    app.doris.components/hash: "1272784587"
+  generation: 1
+  labels:
+    app.doris.ownerreference/name: doriscluster-sample
+    app.kubernetes.io/component: be
   name: doriscluster-sample-be
   namespace: doris
-  labels:
-    app.doris.cluster: doriscluster-sample
+  ownerReferences:
+  - apiVersion: doris.selectdb.com/v1
+    kind: DorisCluster
+    name: doriscluster-sample
 spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
+      app.doris.ownerreference/name: doriscluster-sample-be
       app.kubernetes.io/component: be
-  serviceName: "doriscluster-sample-be-service"
-  replicas: 1
+  serviceName: doriscluster-sample-be-internal
   template:
     metadata:
+      creationTimestamp: null
       labels:
         app.doris.cluster: doriscluster-sample
         app.doris.ownerreference/name: doriscluster-sample-be
         app.kubernetes.io/component: be
+      name: doriscluster-sample-be
     spec:
-      initContainers:
-      - name: default-init
-        image: selectdb/alpine:latest
-        securityContext:
-          privileged: true
-        command: ["/bin/sh"]
-        args: ["-c", "sysctl -w vm.max_map_count=2000000 && swapoff -a"]
-        volumeMounts:
-        - name: kube-api-access
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-          readOnly: true
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - be
+              topologyKey: kubernetes.io/hostname
+            weight: 20
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  kubernetes.io/hostname: fe
+              topologyKey: kubernetes.io/hostname
+            weight: 80
       containers:
-      - name: be
-        image: selectdb/doris.be-ubuntu:2.1.1
-        command: ["/opt/apache-doris/be_entrypoint.sh"]
-        args: ["$(ENV_FE_ADDR)"]
-        ports:
-        - containerPort: 9060
-        - containerPort: 8040
-        - containerPort: 9050
-        - containerPort: 8060
-        resources:
-          limits:
-            cpu: 3
-            memory: 8Gi
-          requests:
-            cpu: 3
-            memory: 8Gi
-        livenessProbe:
-          tcpSocket:
-            port: 9050
-          initialDelaySeconds: 80
-          timeoutSeconds: 180
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 8040
-          initialDelaySeconds: 0
-          timeoutSeconds: 1
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        startupProbe:
-          httpGet:
-            path: /api/health
-            port: 8040
-          initialDelaySeconds: 0
-          timeoutSeconds: 1
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 60
+      - args:
+        - $(ENV_FE_ADDR)
+        command:
+        - /opt/apache-doris/be_entrypoint.sh
         env:
         - name: POD_NAME
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: metadata.name
         - name: POD_IP
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: status.podIP
         - name: HOST_IP
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: status.hostIP
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
+              apiVersion: v1
               fieldPath: metadata.namespace
+        - name: CONFIGMAP_MOUNT_PATH
+          value: /etc/doris
         - name: USER
           value: root
         - name: DORIS_ROOT
@@ -97,43 +92,110 @@ spec:
           value: doriscluster-sample-fe-service
         - name: FE_QUERY_PORT
           value: "9030"
+        image: selectdb/doris.be-ubuntu:2.1.1
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /opt/apache-doris/be_prestop.sh
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 80
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9050
+          timeoutSeconds: 180
+        name: be
+        ports:
+        - containerPort: 9060
+          name: be-port
+          protocol: TCP
+        - containerPort: 8040
+          name: webserver-port
+          protocol: TCP
+        - containerPort: 9050
+          name: heartbeat-port
+          protocol: TCP
+        - containerPort: 8060
+          name: brpc-port
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/health
+            port: 8040
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "3"
+            memory: 8Gi
+          requests:
+            cpu: "3"
+            memory: 8Gi
+        startupProbe:
+          failureThreshold: 60
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9050
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
         volumeMounts:
-        - name: podinfo
-          mountPath: /etc/podinfo
-        - name: be-storage
-          mountPath: /opt/apache-doris/be/storage
-        - name: kube-api-access
-          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-          readOnly: true
+        - mountPath: /etc/podinfo
+          name: podinfo
+        - mountPath: /opt/apache-doris/be/storage
+          name: be-storage
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - args:
+        - -c
+        - sysctl -w vm.max_map_count=2000000 && swapoff -a
+        command:
+        - /bin/sh
+        image: selectdb/alpine:latest
+        imagePullPolicy: IfNotPresent
+        name: default-init
+        resources: {}
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
       volumes:
-      - name: be-storage
-        persistentVolumeClaim:
-          claimName: bold-dorisbe-fileserver-claim
-      - name: podinfo
-        downwardAPI:
+      - emptyDir: {}
+        name: be-storage
+      - downwardAPI:
+          defaultMode: 420
           items:
-          - path: "labels"
-            fieldRef:
+          - fieldRef:
+              apiVersion: v1
               fieldPath: metadata.labels
-          - path: "annotations"
-            fieldRef:
+            path: labels
+          - fieldRef:
+              apiVersion: v1
               fieldPath: metadata.annotations
-      - name: kube-api-access
-        projected:
-          sources:
-          - serviceAccountToken:
-              path: token
-              expirationSeconds: 3607
-          - configMap:
-              name: kube-root-ca.crt
-              items:
-              - key: ca.crt
-                path: ca.crt
-          - downwardAPI:
-              items:
-              - path: "labels"
-                fieldRef:
-                  fieldPath: metadata.labels
-              - path: "annotations"
-                fieldRef:
-                  fieldPath: metadata.annotations
+            path: annotations
+        name: podinfo
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: doriscluster-sample-be-6c45546cf4
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: doriscluster-sample-be-6c45546cf4
+  updatedReplicas: 1
